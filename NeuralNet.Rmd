@@ -79,7 +79,7 @@ table(alzheimers_data$Diagnosis)
 x = as.matrix(alzheimers_data[, -32]) #All but diagnose column
 y = alzheimers_data$Diagnosis
 
-x_tensor = torch_tensor(as.matrix(x), dtype = torch_float())
+x_tensor = torch_tensor(x, dtype = torch_float())
 y_tensor = torch_tensor(as.numeric(y), dtype = torch_float())
 y_tensor
 ```
@@ -90,7 +90,7 @@ library(caret)
 # Define K-fold cross-validation parameters
 k <- 10
 folds <- createFolds(y, k = k, list = TRUE, returnTrain = TRUE)
-
+all_losses <- list()
 result <- numeric(k)
 
 for (i in 1:k) {
@@ -110,7 +110,8 @@ for (i in 1:k) {
   criterion <- nn_bce_with_logits_loss()
 
   # Training loop
-  num_epochs <- 100
+  num_epochs <- 200
+  losses <- numeric(num_epochs)
   for (epoch in 1:num_epochs) {
     optimizer$zero_grad()
     outputs <- neural_model(x_train)
@@ -118,11 +119,15 @@ for (i in 1:k) {
     loss$backward()
     optimizer$step()
     
+    losses[epoch] <- loss$item()
     
-    if (epoch %% 10 == 0) {
+    
+    if (epoch %% 20 == 0) {
     cat("Epoch:", epoch, "Loss:", loss$item(), "\n")
     }
   }
+  
+  all_losses[[i]] <- losses
   
   # Evaluate the model
   neural_model$eval()
@@ -136,7 +141,18 @@ for (i in 1:k) {
 
 # Print cross-validation results
 cat("Cross-Validation Accuracy:", mean(result), "\n")
-
+cat("Loss Percent:", losses[200])
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+library(ggplot2)
+# Plot the training loss for each fold
+loss_df <- do.call(rbind, lapply(1:k, function(i) data.frame(epoch = 1:num_epochs, loss = all_losses[[i]], fold = i)))
+ggplot(loss_df, aes(x = epoch, y = loss, color = factor(fold))) +
+  geom_line() +
+  labs(title = "Training Loss over Epochs for Each Fold", x = "Epoch", y = "Loss", color = "Fold")
+
+
+
+
+```
